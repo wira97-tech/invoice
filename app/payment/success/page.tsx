@@ -4,7 +4,13 @@ import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { CheckCircle, ArrowRight, Download, FileText, Home } from "lucide-react"
 
 export default function PaymentSuccessPage() {
@@ -19,7 +25,8 @@ export default function PaymentSuccessPage() {
     // Extract payment details from URL parameters
     const invoice = searchParams.get("invoice")
     const paymentAmount = searchParams.get("amount")
-    const sessionId = searchParams.get("session_id") || searchParams.get("doku_session_id")
+    const sessionId =
+      searchParams.get("session_id") || searchParams.get("doku_session_id")
 
     setInvoiceNumber(invoice || "")
     setAmount(paymentAmount || "")
@@ -27,8 +34,9 @@ export default function PaymentSuccessPage() {
 
     // If we have session ID but no invoice, try to get it from session storage or localStorage
     if (!invoice && sessionId) {
-      const storedInvoice = sessionStorage.getItem('pending_payment_invoice') ||
-                          localStorage.getItem('pending_payment_invoice')
+      const storedInvoice =
+        sessionStorage.getItem("pending_payment_invoice") ||
+        localStorage.getItem("pending_payment_invoice")
       if (storedInvoice) {
         setInvoiceNumber(storedInvoice)
       }
@@ -43,7 +51,7 @@ export default function PaymentSuccessPage() {
   }, [searchParams])
 
   const formatCurrency = (value: string | number) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value
+    const num = typeof value === "string" ? parseFloat(value) : value
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
@@ -55,7 +63,9 @@ export default function PaymentSuccessPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-green-600 font-medium">Processing payment confirmation...</p>
+          <p className="text-green-600 font-medium">
+            Processing payment confirmation...
+          </p>
         </div>
       </div>
     )
@@ -114,12 +124,12 @@ export default function PaymentSuccessPage() {
             <div className="flex justify-between">
               <span className="text-gray-600">Payment Date:</span>
               <span className="font-medium">
-                {new Date().toLocaleDateString('id-ID', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
+                {new Date().toLocaleDateString("id-ID", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
                 })}
               </span>
             </div>
@@ -134,7 +144,7 @@ export default function PaymentSuccessPage() {
         </Card>
 
         {/* Next Steps Card */}
-        <Card className="border-green-200 bg-green-50/50 mb-6">
+        {/* <Card className="border-green-200 bg-green-50/50 mb-6">
           <CardHeader>
             <CardTitle className="text-green-800 text-lg">What's Next?</CardTitle>
           </CardHeader>
@@ -154,10 +164,10 @@ export default function PaymentSuccessPage() {
               </li>
             </ul>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Action Buttons */}
-        <div className="space-y-3">
+        {/* <div className="space-y-3">
           <Link href="/invoices" className="w-full">
             <Button className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2">
               <Home className="w-4 h-4" />
@@ -167,7 +177,10 @@ export default function PaymentSuccessPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Link href="/dashboard">
-              <Button variant="outline" className="w-full border-green-200 text-green-700 hover:bg-green-50 flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                className="w-full border-green-200 text-green-700 hover:bg-green-50 flex items-center justify-center gap-2"
+              >
                 <ArrowRight className="w-4 h-4" />
                 Dashboard
               </Button>
@@ -175,20 +188,26 @@ export default function PaymentSuccessPage() {
 
             {invoiceNumber && (
               <Link href={`/invoices/${invoiceNumber}`}>
-                <Button variant="outline" className="w-full border-green-200 text-green-700 hover:bg-green-50 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  className="w-full border-green-200 text-green-700 hover:bg-green-50 flex items-center justify-center gap-2"
+                >
                   <FileText className="w-4 h-4" />
                   View Invoice
                 </Button>
               </Link>
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Help Section */}
         <div className="mt-8 text-center">
           <p className="text-sm text-green-600">
             Need help?{" "}
-            <Link href="#" className="underline hover:text-green-700">
+            <Link
+              href="contact@algoseabiz.com"
+              className="underline hover:text-green-700"
+            >
               Contact Support
             </Link>
           </p>

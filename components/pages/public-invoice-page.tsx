@@ -69,7 +69,7 @@ export default function PublicInvoicePage() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to load invoice')
+        throw new Error(errorData.error || "Failed to load invoice")
       }
 
       const data = await response.json()
@@ -409,7 +409,7 @@ export default function PublicInvoicePage() {
 
     const shareUrl = `${window.location.origin}/invoice/${invoice.id}`
 
-    if ('share' in navigator && navigator.share) {
+    if ("share" in navigator && navigator.share) {
       try {
         await navigator.share({
           title: `Invoice #${invoice.invoice_number}`,
@@ -417,15 +417,15 @@ export default function PublicInvoicePage() {
           url: shareUrl,
         })
       } catch (error) {
-        console.log('Error sharing:', error)
+        console.log("Error sharing:", error)
       }
     } else {
       // Fallback: copy to clipboard
       try {
         await navigator.clipboard.writeText(shareUrl)
-        alert('Share link copied to clipboard!')
+        alert("Share link copied to clipboard!")
       } catch (error) {
-        console.error('Error copying to clipboard:', error)
+        console.error("Error copying to clipboard:", error)
       }
     }
   }
@@ -451,7 +451,8 @@ export default function PublicInvoicePage() {
             Invoice Not Found
           </h1>
           <p className="text-gray-600 mb-4">
-            {error || "The invoice you're looking for doesn't exist or is not available for public viewing."}
+            {error ||
+              "The invoice you're looking for doesn't exist or is not available for public viewing."}
           </p>
         </div>
       </div>
@@ -560,7 +561,9 @@ export default function PublicInvoicePage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">Public Invoice View</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Public Invoice View
+          </h1>
           <Badge variant="outline" className="flex items-center gap-1">
             <Share2 className="w-3 h-3" />
             Shareable
@@ -589,7 +592,7 @@ export default function PublicInvoicePage() {
           {invoice.status !== "Paid" && invoice.status !== "Cancelled" && (
             <Button onClick={handlePayment} className="flex items-center gap-2">
               <CreditCard className="w-4 h-4" />
-              Pay Now
+              Pay with card
             </Button>
           )}
         </div>

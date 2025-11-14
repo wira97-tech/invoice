@@ -33,27 +33,19 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  ChevronRight,
   Lock,
   Share2,
-  Link,
 } from "lucide-react"
 import {
-  getInvoice,
   formatCurrency,
   type InvoiceWithClient,
   type InvoiceItem,
 } from "@/lib/database"
 import { COMPANY_INFO } from "@/lib/company-config"
-import {
-  createPayment,
-  type PaymentRequest,
-  type PaymentResponse,
-} from "@/lib/payment-config"
 import { createDokuPayment } from "@/lib/doku-client"
 import Image from "next/image"
 
-export default function InvoiceDetailPage() {
+export default function PublicInvoicePage() {
   const params = useParams()
   const router = useRouter()
   const [invoice, setInvoice] = useState<InvoiceWithClient | null>(null)
@@ -61,23 +53,29 @@ export default function InvoiceDetailPage() {
   const [error, setError] = useState("")
   const [showPaymentOptions, setShowPaymentOptions] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<any>(null)
-  const [showShareDialog, setShowShareDialog] = useState(false)
-  const [shareUrl, setShareUrl] = useState("")
-  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
 
   useEffect(() => {
     if (params?.slug) {
-      loadInvoice(params.slug as string)
+      loadPublicInvoice(params.slug as string)
     }
   }, [params?.slug])
 
-  const loadInvoice = async (id: string) => {
+  const loadPublicInvoice = async (id: string) => {
     try {
       setIsLoading(true)
-      const data = await getInvoice(id)
-      setInvoice(data)
+
+      // Fetch public invoice data
+      const response = await fetch(`/api/invoices/${id}/public`)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to load invoice')
+      }
+
+      const data = await response.json()
+      setInvoice(data.invoice)
     } catch (error: any) {
-      console.error("Error loading invoice:", error)
+      console.error("Error loading public invoice:", error)
       setError(error.message || "Failed to load invoice")
     } finally {
       setIsLoading(false)
@@ -406,6 +404,32 @@ export default function InvoiceDetailPage() {
     )
   }
 
+  const handleShare = async () => {
+    if (!invoice) return
+
+    const shareUrl = `${window.location.origin}/invoice/${invoice.id}`
+
+    if ('share' in navigator && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Invoice #${invoice.invoice_number}`,
+          text: `View and pay invoice #${invoice.invoice_number}`,
+          url: shareUrl,
+        })
+      } catch (error) {
+        console.log('Error sharing:', error)
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        alert('Share link copied to clipboard!')
+      } catch (error) {
+        console.error('Error copying to clipboard:', error)
+      }
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-8">
@@ -427,12 +451,8 @@ export default function InvoiceDetailPage() {
             Invoice Not Found
           </h1>
           <p className="text-gray-600 mb-4">
-            {error || "The invoice you're looking for doesn't exist."}
+            {error || "The invoice you're looking for doesn't exist or is not available for public viewing."}
           </p>
-          <Button onClick={() => router.back()}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
-          </Button>
         </div>
       </div>
     )
@@ -458,21 +478,6 @@ export default function InvoiceDetailPage() {
     // Store invoice info in session storage for payment completion
     const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
     sessionStorage.setItem("pending_payment_invoice", invoiceNumber)
-
-    // Verify invoice exists in database before sending to DOKU
-    try {
-      console.log(
-        `[PAYMENT] Verifying invoice ${invoiceNumber} exists in database...`
-      )
-      // We'll verify this on the server side to avoid client-side DB calls
-
-      // Add a small delay to ensure database is ready (especially for newly created invoices)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-    } catch (error) {
-      console.error("[PAYMENT] Error during pre-payment verification:", error)
-      setError("Failed to verify invoice. Please try again.")
-      return
-    }
 
     try {
       const clientData = (invoice as any).client ?? {
@@ -550,85 +555,17 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  const showPaymentOptionsDialog = (paymentResponse: PaymentResponse) => {
-    const cardOnly = {
-      session_id: paymentResponse.session_id,
-      payment_url: paymentResponse.payment_url,
-      credit_card_enabled: paymentResponse.credit_card_enabled ?? true,
-      card_payment_methods: Array.isArray(paymentResponse.card_payment_methods)
-        ? paymentResponse.card_payment_methods
-        : [],
-      // kita intentionally omit installment_options, va_numbers, ewallet, dll.
-    } as PaymentResponse
-
-    setSelectedPayment(cardOnly)
-    setShowPaymentOptions(true)
-  }
-
-  const handlePaymentMethodSelect = (url: string) => {
-    if (url) {
-      window.open(url, "_blank")
-    } else {
-      setError("Payment method not available")
-    }
-  }
-
-  const handleShare = async () => {
-    if (!invoice) return
-
-    try {
-      // Get or generate share token
-      const response = await fetch(`/api/invoices/${invoice.id}/public`)
-      const data = await response.json()
-
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-      const url = `${baseUrl}/invoice/${invoice.id}`
-
-      setShareUrl(url)
-      setShowShareDialog(true)
-      setCopiedToClipboard(false)
-    } catch (error) {
-      console.error("Error generating share link:", error)
-      setError("Failed to generate share link")
-    }
-  }
-
-  const handleCopyShareLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopiedToClipboard(true)
-      setTimeout(() => setCopiedToClipboard(false), 3000)
-    } catch (error) {
-      console.error("Failed to copy to clipboard:", error)
-    }
-  }
-
-  const handleShareViaNative = async () => {
-    if ("share" in navigator && navigator.share) {
-      try {
-        await navigator.share({
-          title: `Invoice #${invoice?.invoice_number}`,
-          text: `View and pay invoice #${invoice?.invoice_number}`,
-          url: shareUrl,
-        })
-      } catch (error) {
-        console.log("Error sharing:", error)
-      }
-    }
-  }
-
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Invoices
-        </Button>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Public Invoice View</h1>
+          <Badge variant="outline" className="flex items-center gap-1">
+            <Share2 className="w-3 h-3" />
+            Shareable
+          </Badge>
+        </div>
 
         <div className="flex items-center gap-3">
           <Button
@@ -665,7 +602,6 @@ export default function InvoiceDetailPage() {
           {/* Company Info */}
           <div className="flex-1">
             <div className="w-24 h-24 rounded-lg flex items-center justify-center mb-4">
-              {/* <span className="text-white text-2xl font-bold">ISI</span> */}
               <Image
                 src={COMPANY_INFO.logoUrl}
                 width={100}
@@ -875,168 +811,6 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Payment Options Dialog */}
-      {/* Payment Options Dialog (English) */}
-      {/* Payment Options Dialog (Card-only, simplified) */}
-      <Dialog open={showPaymentOptions} onOpenChange={setShowPaymentOptions}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Payment
-            </DialogTitle>
-            <DialogDescription>
-              Invoice #{invoice?.invoice_number}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedPayment && (
-            <div className="space-y-4">
-              {/* Payment Summary */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Total Amount
-                    </p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {formatCurrency(totalAmount)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Order ID: {selectedPayment.session_id}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Description Only */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800 font-medium">
-                  You can complete your payment using a credit or debit card.
-                </p>
-                <p className="text-xs text-blue-700 mt-1">
-                  Supported cards: Visa, Mastercard, JCB, and selected debit
-                  cards.
-                </p>
-              </div>
-
-              {/* Security Info */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-green-800">
-                  <Lock className="w-4 h-4" />
-                  <span className="text-sm font-medium">Secure Payment</span>
-                </div>
-                <p className="text-xs text-green-700 mt-1">
-                  Your transaction is protected with SSL and 3D Secure
-                  technology.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setShowPaymentOptions(false)}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              onClick={() =>
-                handlePaymentMethodSelect(selectedPayment?.payment_url)
-              }
-            >
-              Proceed to Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Share Dialog */}
-      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-        <DialogContent className="sm:max-w-lg max-w-[95vw] p-6">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <Share2 className="w-5 h-5" />
-              Share Invoice
-            </DialogTitle>
-            <DialogDescription>
-              Share a secure link to invoice #{invoice?.invoice_number}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {/* Share URL Display */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Share Link
-              </label>
-              <div className="flex flex-col gap-2">
-                <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-600 break-all">
-                  {shareUrl}
-                </div>
-                {/* <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCopyShareLink}
-                  className="w-full sm:w-auto self-end flex items-center gap-1"
-                >
-                  <Link className="w-3 h-3" />
-                  {copiedToClipboard ? "Copied!" : "Copy"}
-                </Button> */}
-              </div>
-            </div>
-
-            {/* Share Options */}
-            <div className="space-y-3">
-              <Button
-                variant="outline"
-                onClick={handleCopyShareLink}
-                className="w-full flex items-center gap-2"
-              >
-                <Link className="w-4 h-4" />
-                {copiedToClipboard ? "Link Copied!" : "Copy Link"}
-              </Button>
-
-              {typeof window !== "undefined" && "share" in navigator && (
-                <Button
-                  onClick={handleShareViaNative}
-                  className="w-full flex items-center gap-2"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share via...
-                </Button>
-              )}
-            </div>
-
-            {/* Security Note */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Lock className="w-4 h-4 text-blue-600 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                  <p className="font-medium">Secure Sharing</p>
-                  <p className="text-xs mt-1">
-                    Anyone with this link can view and pay this invoice. Share
-                    only with trusted recipients.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowShareDialog(false)}
-              className="w-full sm:w-auto"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Footer */}
       <div className="text-center mt-8 text-gray-500 text-sm">

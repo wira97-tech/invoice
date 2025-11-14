@@ -9,17 +9,17 @@ const inter = Inter({ subsets: ["latin"] })
 const robotoMono = Roboto_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Invoice Dashboard",
+  title: "Invoice Dashboard Seoboost",
   description: "Professional invoice management system",
-  generator: "v0.app",
+  generator: "Wiranto",
   icons: {
     icon: [
       {
-        url: "/icon-light-32x32.png",
+        url: "/favicon.ico",
         media: "(prefers-color-scheme: light)",
       },
       {
-        url: "/icon-dark-32x32.png",
+        url: "/favicon.ico",
         media: "(prefers-color-scheme: dark)",
       },
       {
@@ -46,9 +46,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} font-sans antialiased`}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
         <Analytics />
       </body>
     </html>

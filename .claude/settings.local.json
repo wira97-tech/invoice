@@ -9,7 +9,8 @@
       "Bash(findstr:*)",
       "WebSearch",
       "Bash(node:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []

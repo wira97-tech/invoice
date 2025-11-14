@@ -290,6 +290,140 @@ export async function deleteInvoiceItem(id: string): Promise<void> {
   if (error) throw error
 }
 
+// INVOICE STATUS UPDATE FUNCTIONS
+export async function updateInvoiceStatus(
+  id: string,
+  status: "Draft" | "Pending" | "Paid" | "Overdue" | "Cancelled"
+): Promise<InvoiceWithClient> {
+  const { data, error } = await supabase
+    .from("invoices")
+    .update({
+      status,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  // Get the complete updated invoice with client info
+  const completeInvoice = await getInvoice(id)
+  return completeInvoice!
+}
+
+export async function updateInvoiceStatusByNumber(
+  invoiceNumber: string,
+  status: "Draft" | "Pending" | "Paid" | "Overdue" | "Cancelled"
+): Promise<InvoiceWithClient | null> {
+  console.log(`[DB] Looking for invoice with number: ${invoiceNumber}`)
+
+  // Try multiple approaches to find the invoice
+  let invoiceData = null
+  let findError = null
+
+  // 1. Exact match first
+  const { data: exactData, error: exactError } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, status")
+    .eq("invoice_number", invoiceNumber)
+    .single()
+
+  console.log(`[DB] Exact match result:`, { data: exactData, error: exactError })
+
+  if (exactData && !exactError) {
+    invoiceData = exactData
+    findError = null
+  } else {
+    // 2. Try with LIKE if exact match fails
+    const { data: likeData, error: likeError } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, status")
+      .ilike("invoice_number", `%${invoiceNumber}%`)
+      .limit(5)
+
+    console.log(`[DB] LIKE search result:`, { data: likeData, error: likeError })
+
+    if (likeData && likeData.length > 0 && !likeError) {
+      // Take the first match
+      invoiceData = likeData[0]
+      console.log(`[DB] Using LIKE match: ${invoiceData.invoice_number}`)
+      findError = null
+    } else {
+      // 3. Try to extract numeric ID and search by ID
+      const numericMatch = invoiceNumber.match(/\d+/)
+      if (numericMatch) {
+        const possibleId = numericMatch[0]
+        const { data: idData, error: idError } = await supabase
+          .from("invoices")
+          .select("id, invoice_number, status")
+          .eq("id", possibleId)
+          .single()
+
+        console.log(`[DB] ID search result:`, { data: idData, error: idError, searchId: possibleId })
+
+        if (idData && !idError) {
+          invoiceData = idData
+          console.log(`[DB] Using ID match: ${invoiceData.invoice_number}`)
+          findError = null
+        } else {
+          findError = likeError || exactError || new Error(`Invoice with number ${invoiceNumber} not found`)
+        }
+      } else {
+        findError = likeError || exactError || new Error(`Invoice with number ${invoiceNumber} not found`)
+      }
+    }
+  }
+
+  if (findError || !invoiceData) {
+    // Log all existing invoice numbers for debugging
+    let allInvoices = []
+    let listError = null
+
+    try {
+      const result = await supabase
+        .from("invoices")
+        .select("invoice_number, id, created_at")
+        .limit(10)
+        .order("created_at", { ascending: false })
+
+      allInvoices = result.data || []
+      listError = result.error
+
+      console.log(`[DB] Database query result:`, {
+        count: allInvoices.length,
+        error: listError
+      })
+
+    } catch (queryError) {
+      console.error(`[DB] Error querying invoices:`, queryError)
+      listError = queryError
+    }
+
+    console.error(`[DB] Invoice not found: ${invoiceNumber}`)
+    console.error(`[DB] Recent invoice numbers:`, allInvoices?.map(inv => inv.invoice_number))
+    console.error(`[DB] Total invoices in DB:`, allInvoices.length)
+
+    // Provide more helpful error message
+    const recentInvoices = allInvoices?.map(inv => inv.invoice_number).join(', ') || 'none'
+    const errorMsg = `Invoice with number "${invoiceNumber}" not found. Database has ${allInvoices.length} invoices. Recent: ${recentInvoices}`
+
+    // For better debugging, show the exact query that was tried
+    console.error(`[DB] Queries attempted:`, {
+      exactMatch: `invoice_number = '${invoiceNumber}'`,
+      likeSearch: `invoice_number ILIKE '%${invoiceNumber}%'`,
+      idSearch: invoiceNumber.match(/\d+/) ? `id = '${invoiceNumber.match(/\d+/)[0]}'` : 'No numeric ID found'
+    })
+
+    throw new Error(errorMsg)
+  }
+
+  console.log(`[DB] Found invoice: ${invoiceData.invoice_number} (ID: ${invoiceData.id}), current status: ${invoiceData.status}`)
+
+  // Update the status using the ID
+  return await updateInvoiceStatus(invoiceData.id, status)
+}
+
 // DASHBOARD STATISTICS
 export async function getDashboardStats() {
   const { data, error } = await supabase
@@ -362,12 +496,13 @@ export interface RecentInvoice {
 
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   try {
-    // Get total revenue from invoices
-    const { data: invoicesData, error: invoicesError } = await supabase
+    // Get total revenue from PAID invoices only
+    const { data: paidInvoicesData, error: paidInvoicesError } = await supabase
       .from("invoices")
       .select("total_amount")
+      .eq("status", "Paid")
 
-    if (invoicesError) throw invoicesError
+    if (paidInvoicesError) throw paidInvoicesError
 
     // Get total invoices count
     const { count: totalInvoices, error: countError } = await supabase
@@ -385,7 +520,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     if (clientError) throw clientError
 
     const totalRevenue =
-      invoicesData?.reduce(
+      paidInvoicesData?.reduce(
         (sum, invoice) => sum + (invoice.total_amount || 0),
         0
       ) || 0
@@ -419,9 +554,11 @@ export async function getMonthlyRevenue(
     const startDate = new Date()
     startDate.setMonth(startDate.getMonth() - months)
 
+    // Get only PAID invoices for revenue trend
     const { data, error } = await supabase
       .from("invoices")
       .select("total_amount, created_at")
+      .eq("status", "Paid")
       .gte("created_at", startDate.toISOString())
       .order("created_at", { ascending: true })
 
@@ -487,18 +624,24 @@ export async function getInvoiceStatusDistribution(): Promise<
       0
     )
 
-    return Object.entries(statusCount).map(([status, count]) => ({
+    // Define standard status order and colors
+    const statusOrder = ["Paid", "Pending", "Overdue", "Draft", "Cancelled"]
+
+    // Map status counts and ensure all statuses are included
+    const result = statusOrder.map(status => ({
       name: status,
-      count,
-      value: Math.round((count / total) * 100),
-    }))
+      count: statusCount[status] || 0,
+      value: total > 0 ? Math.round(((statusCount[status] || 0) / total) * 100) : 0,
+    })).filter(item => item.count > 0) // Only include statuses that have invoices
+
+    return result.length > 0 ? result : [
+      { name: "No Data", value: 100, count: 0 }
+    ]
   } catch (error) {
     console.error("Error fetching invoice status distribution:", error)
-    // Return mock data
+    // Return fallback data indicating no data available
     return [
-      { name: "Paid", value: 65, count: 802 },
-      { name: "Pending", value: 20, count: 247 },
-      { name: "Overdue", value: 15, count: 185 },
+      { name: "No Data", value: 100, count: 0 }
     ]
   }
 }

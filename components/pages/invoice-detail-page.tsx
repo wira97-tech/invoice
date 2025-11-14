@@ -42,7 +42,6 @@ import {
   type InvoiceWithClient,
   type InvoiceItem,
 } from "@/lib/database"
-import { generateInvoicePDF, type InvoicePDFData } from "@/lib/pdf-generator"
 import { COMPANY_INFO } from "@/lib/company-config"
 import {
   createPayment,
@@ -79,49 +78,294 @@ export default function InvoiceDetailPage() {
     }
   }
 
-  const handleDownloadPDF = async () => {
+  const handlePrintPDF = () => {
     if (!invoice) return
 
-    try {
-      const clientData = invoice.client as any
+    // Create print styles
+    const printStyles = document.createElement('style')
+    printStyles.textContent = `
+      @media print {
+        /* Hide screen-only elements */
+        .container.mx-auto.py-8.px-4.max-w-6xl > div:first-child {
+          display: none !important;
+        }
 
-      const pdfData: InvoicePDFData = {
-        invoice: {
-          invoice_number: invoice.invoice_number || `INV-${invoice.id}`,
-          issue_date:
-            invoice.issue_date ||
-            invoice.created_at ||
-            new Date().toISOString(),
-          due_date: invoice.due_date,
-          description: invoice.description || "",
-          status: invoice.status || "Draft",
-          total_amount: invoice.total_amount || 0,
-          subtotal: invoice.subtotal,
-          tax_rate: invoice.tax_rate,
-          tax_amount: invoice.tax_amount,
-          notes: invoice.notes,
-        },
-        client: {
-          name: clientData?.name || invoice.client_name || "",
-          email: clientData?.email || invoice.client_email || "",
-          company: clientData?.company || invoice.client_company || "",
-          address: clientData?.address || "",
-          phone: clientData?.phone || "",
-        },
-        items:
-          invoice.items?.map((item) => ({
-            description: item.description,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            total_price: item.total_price || item.quantity * item.unit_price,
-          })) || [],
+        .container.mx-auto.py-8.px-4.max-w-6xl > div:last-child {
+          display: none !important;
+        }
+
+        /* Hide payment dialog */
+        .fixed.inset-0 {
+          display: none !important;
+        }
+
+        /* Remove shadows and adjust borders */
+        .shadow-lg {
+          box-shadow: none !important;
+        }
+
+        /* Ensure proper spacing and layout */
+        .bg-white.rounded-lg.shadow-lg.border.p-8 {
+          box-shadow: none !important;
+          border: 1px solid #e5e7eb !important;
+          page-break-inside: avoid;
+          margin: 0 !important;
+          max-width: 100% !important;
+        }
+
+        /* Force colors to print */
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        /* Table styling */
+        table {
+          border-collapse: collapse !important;
+          width: 100% !important;
+        }
+
+        th, td {
+          border: 1px solid #e5e7eb !important;
+          padding: 12px !important;
+        }
+
+        th {
+          background-color: #f9fafb !important;
+          font-weight: 600 !important;
+        }
+
+        /* Ensure colors are preserved */
+        .bg-orange-500 {
+          background-color: #f97316 !important;
+          color: white !important;
+        }
+
+        .text-orange-500 {
+          color: #f97316 !important;
+        }
+
+        .text-orange-600 {
+          color: #ea580c !important;
+        }
+
+        .bg-green-100 {
+          background-color: #dcfce7 !important;
+          color: #166534 !important;
+        }
+
+        .bg-orange-100 {
+          background-color: #fed7aa !important;
+          color: #9a3412 !important;
+        }
+
+        .bg-red-100 {
+          background-color: #fee2e2 !important;
+          color: #991b1b !important;
+        }
+
+        .bg-gray-100 {
+          background-color: #f3f4f6 !important;
+          color: #374151 !important;
+        }
+
+        .bg-gray-50 {
+          background-color: #f9fafb !important;
+        }
+
+        /* Remove hover effects */
+        .hover\\:bg-gray-50:hover {
+          background-color: inherit !important;
+        }
+
+        /* Page setup */
+        @page {
+          margin: 20mm;
+          size: A4;
+        }
+
+        body {
+          margin: 0;
+          padding: 15px;
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+        }
+
+        /* Prevent page breaks inside important elements */
+        .bg-white.rounded-lg.shadow-lg.border.p-8,
+        .border.rounded-lg.overflow-hidden,
+        .card {
+          page-break-inside: avoid;
+        }
+
+        /* Ensure Tailwind classes work in print */
+        .grid {
+          display: grid !important;
+        }
+
+        .grid-cols-1 {
+          grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+        }
+
+        .grid-cols-2 {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        .grid-cols-3 {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+
+        .flex {
+          display: flex !important;
+        }
+
+        .items-center {
+          align-items: center !important;
+        }
+
+        .justify-between {
+          justify-content: space-between !important;
+        }
+
+        .justify-end {
+          justify-content: flex-end !important;
+        }
+
+        .text-right {
+          text-align: right !important;
+        }
+
+        .text-center {
+          text-align: center !important;
+        }
+
+        .w-full {
+          width: 100% !important;
+        }
+
+        .w-80 {
+          width: 20rem !important;
+        }
+
+        .w-24 {
+          width: 6rem !important;
+        }
+
+        .h-24 {
+          height: 6rem !important;
+        }
+
+        .p-8 {
+          padding: 2rem !important;
+        }
+
+        .p-6 {
+          padding: 1.5rem !important;
+        }
+
+        .p-4 {
+          padding: 1rem !important;
+        }
+
+        .px-6 {
+          padding-left: 1.5rem !important;
+          padding-right: 1.5rem !important;
+        }
+
+        .py-4 {
+          padding-top: 1rem !important;
+          padding-bottom: 1rem !important;
+        }
+
+        .mb-8 {
+          margin-bottom: 2rem !important;
+        }
+
+        .mb-6 {
+          margin-bottom: 1.5rem !important;
+        }
+
+        .mb-4 {
+          margin-bottom: 1rem !important;
+        }
+
+        .mt-3 {
+          margin-top: 0.75rem !important;
+        }
+
+        .gap-2 {
+          gap: 0.5rem !important;
+        }
+
+        .gap-3 {
+          gap: 0.75rem !important;
+        }
+
+        .gap-4 {
+          gap: 1rem !important;
+        }
+
+        .gap-8 {
+          gap: 2rem !important;
+        }
+
+        .text-3xl {
+          font-size: 1.875rem !important;
+          line-height: 2.25rem !important;
+        }
+
+        .text-2xl {
+          font-size: 1.5rem !important;
+          line-height: 2rem !important;
+        }
+
+        .text-lg {
+          font-size: 1.125rem !important;
+          line-height: 1.75rem !important;
+        }
+
+        .text-sm {
+          font-size: 0.875rem !important;
+          line-height: 1.25rem !important;
+        }
+
+        .font-bold {
+          font-weight: 700 !important;
+        }
+
+        .font-medium {
+          font-weight: 500 !important;
+        }
+
+        .font-semibold {
+          font-weight: 600 !important;
+        }
+
+        .rounded-lg {
+          border-radius: 0.5rem !important;
+        }
+
+        .border {
+          border: 1px solid #e5e7eb !important;
+        }
+
+        .divide-y > :not([hidden]) ~ :not([hidden]) {
+          border-top: 1px solid #e5e7eb !important;
+        }
       }
+    `
 
-      await generateInvoicePDF(pdfData)
-    } catch (error: any) {
-      console.error("Error downloading PDF:", error)
-      setError(error.message || "Failed to download PDF")
-    }
+    // Add print styles to document head
+    document.head.appendChild(printStyles)
+
+    // Trigger print dialog
+    window.print()
+
+    // Remove print styles after print dialog closes (with a delay)
+    setTimeout(() => {
+      if (document.head.contains(printStyles)) {
+        document.head.removeChild(printStyles)
+      }
+    }, 1000)
   }
 
   const getStatusBadge = (status: string) => {
@@ -205,6 +449,24 @@ export default function InvoiceDetailPage() {
   const handlePayment = async () => {
     if (!invoice) return
 
+    // Store invoice info in session storage for payment completion
+    const invoiceNumber = invoice.invoice_number || `INV-${invoice.id}`
+    sessionStorage.setItem('pending_payment_invoice', invoiceNumber)
+
+    // Verify invoice exists in database before sending to DOKU
+    try {
+      console.log(`[PAYMENT] Verifying invoice ${invoiceNumber} exists in database...`)
+      // We'll verify this on the server side to avoid client-side DB calls
+
+      // Add a small delay to ensure database is ready (especially for newly created invoices)
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+    } catch (error) {
+      console.error("[PAYMENT] Error during pre-payment verification:", error)
+      setError("Failed to verify invoice. Please try again.")
+      return
+    }
+
     try {
       const clientData = (invoice as any).client ?? {
         name: invoice.client_name || "Customer",
@@ -239,10 +501,13 @@ export default function InvoiceDetailPage() {
           callback_url: `${
             process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
           }/api/payment/callback`,
+          success_url: `${
+            process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+          }/payment/success?invoice=${encodeURIComponent(invoice.invoice_number || `INV-${invoice.id}`)}&amount=${totalAmount}&session_id=`,
           failed_url: `${
             process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-          }/payment/failed`,
-          auto_redirect: false,
+          }/payment/failed?invoice=${encodeURIComponent(invoice.invoice_number || `INV-${invoice.id}`)}&amount=${totalAmount}`,
+          auto_redirect: true,
           descriptor: invoice.description?.slice(0, 20) || "Invoice Payment",
         },
         // card token optional; for card page usually not needed (DOKU will show card form)
@@ -266,8 +531,8 @@ export default function InvoiceDetailPage() {
       const paymentUrl = result.payment_url || result.data?.session?.url
       if (!paymentUrl) throw new Error("Payment URL not returned by DOKU")
 
-      // buka di tab baru (atau window.location.href = paymentUrl untuk redirect)
-      window.open(paymentUrl, "_blank")
+      // Redirect ke payment page untuk auto_redirect handling yang lebih baik
+      window.location.href = paymentUrl
     } catch (error: any) {
       console.error("Payment error:", error)
       setError(error.message || "Failed to process payment")
@@ -313,11 +578,11 @@ export default function InvoiceDetailPage() {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            onClick={handleDownloadPDF}
+            onClick={handlePrintPDF}
             className="flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Download PDF
+            Print PDF
           </Button>
 
           {invoice.status !== "Paid" && invoice.status !== "Cancelled" && (

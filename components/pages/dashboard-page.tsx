@@ -60,7 +60,13 @@ export function DashboardPage() {
     }
   }
 
-  const COLORS = ["hsl(var(--color-chart-1))", "hsl(var(--color-chart-2))", "hsl(var(--color-destructive))"]
+  const COLORS = [
+  "#ea580c", // Orange 600 - darkest
+  "#fb923c", // Orange 400 - medium
+  "#fed7aa", // Orange 200 - light
+  "#ffedd5", // Orange 100 - very light
+  "#fff7ed", // Orange 50 - lightest
+]
 
   if (loading) {
     return (
@@ -170,11 +176,11 @@ export function DashboardPage() {
               config={{
                 revenue: {
                   label: "Revenue (Rp)",
-                  color: "hsl(var(--color-chart-1))",
+                  color: "#ea580c",
                 },
                 invoices: {
                   label: "Invoices",
-                  color: "hsl(var(--color-chart-2))",
+                  color: "#fb923c",
                 },
               }}
               className="h-80"
@@ -196,8 +202,8 @@ export function DashboardPage() {
                     ]}
                   />
                   <Legend />
-                  <Line type="monotone" dataKey="revenue" stroke="hsl(var(--color-chart-1))" strokeWidth={2} />
-                  <Line type="monotone" dataKey="invoices" stroke="hsl(var(--color-chart-2))" strokeWidth={2} />
+                  <Line type="monotone" dataKey="revenue" stroke="#ea580c" strokeWidth={2} />
+                  <Line type="monotone" dataKey="invoices" stroke="#fb923c" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </ChartContainer>
@@ -213,9 +219,9 @@ export function DashboardPage() {
           <CardContent className="flex items-center justify-center">
             <ChartContainer
               config={{
-                paid: { label: "Paid", color: "hsl(var(--color-chart-1))" },
-                pending: { label: "Pending", color: "hsl(var(--color-chart-2))" },
-                overdue: { label: "Overdue", color: "hsl(var(--color-destructive))" },
+                paid: { label: "Paid", color: "#ea580c" },
+                pending: { label: "Pending", color: "#fb923c" },
+                overdue: { label: "Overdue", color: "#fed7aa" },
               }}
               className="h-64 w-full"
             >
